@@ -34,8 +34,8 @@ The pairing file remains in the iPhone Keychain. It is not uploaded to the route
 
 ## Validation status
 
-- GitHub Actions run `35075017699` completed successfully with release-invariant checks, Rust native-bridge tests, both arm64 XCFramework slices, an unsigned iPhoneOS Release archive and IPA packaging.
-- IPA SHA-256: `5f1e2845d4cc8ac582d47b8db92913d15a9b86e4289c09619a268248450ff0e7`.
-- Rebuilt XCFramework archive SHA-256: `95d960295e1a569b1bef8d1de1a7ebaedfc2ce3d8a497b0351b56ebaefc71be1`.
+- GitHub Actions run `35075766453` completed successfully for tag `v0.10.0-preview-build.62` with release-invariant checks, Rust native-bridge tests, both arm64 XCFramework slices, an unsigned iPhoneOS Release archive, IPA packaging and GitHub Release publication.
+- IPA SHA-256: `ea7e8d7ca9dad0c0272b5d3fe3b38487f11d837d71ef7e10333e09bafb9e3f93`.
+- Rebuilt XCFramework archive SHA-256: `ce046e0d6e6bf36a3a29f526e7836d9e73191e109cd94cdbebfdf11778511d1b`.
 - IPA metadata verifies version `0.10.0`, build `62`, bundle identifier `com.sean.roamcontrol`, iOS 27.0 minimum, arm64 iPhoneOS and the `roamcontrol` URL scheme.
 - A real iPhone still needs to validate Remote Endpoint fixed location, in-session updates, Stop & Restore, interrupted-session recovery and long-running background behavior. This release note does not claim those physical-device checks until they are performed.
