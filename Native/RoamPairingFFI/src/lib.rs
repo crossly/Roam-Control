@@ -310,6 +310,7 @@ pub unsafe extern "C" fn rc_location_session_run(
     remote_pairing_port: u16,
     service_identifier: *const c_char,
     auth_tag: *const c_char,
+    verify_service_metadata: i32,
     latitude: f64,
     longitude: f64,
     started_callback: LocationStartedCallback,
@@ -335,6 +336,8 @@ pub unsafe extern "C" fn rc_location_session_run(
     let peer_address = unsafe { optional_c_string(peer_address, "10.7.0.1") };
     let service_identifier = unsafe { optional_c_string(service_identifier, "") };
     let auth_tag = unsafe { optional_c_string(auth_tag, "") };
+    let verify_service_metadata = verify_service_metadata != 0;
+
     let cancellation = Arc::clone(&session.cancelled);
     let coordinates = Arc::clone(&session.coordinates);
     if let Ok(mut current) = coordinates.lock() {
@@ -358,6 +361,7 @@ pub unsafe extern "C" fn rc_location_session_run(
             remote_pairing_port,
             service_identifier,
             auth_tag,
+            verify_service_metadata,
             coordinates,
             started_callback,
             callback_context,
@@ -469,23 +473,27 @@ async fn run_location_session(
     remote_pairing_port: u16,
     service_identifier: String,
     auth_tag: String,
+    verify_service_metadata: bool,
+
     coordinates: Arc<Mutex<LocationCoordinates>>,
     started_callback: LocationStartedCallback,
     callback_context: usize,
     cancellation: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let mut applied_coordinates = current_coordinates(&coordinates)?;
-    if remote_pairing_port == 0 || service_identifier.is_empty() || auth_tag.is_empty() {
+    if remote_pairing_port == 0 {
         return Err("Roam Control could not identify this iPhone's pairing service.".to_string());
     }
 
     let mut pairing_file = RpPairingFile::from_bytes(&pairing_record_bytes)
         .map_err(|_| "The saved pairing record could not be read.".to_string())?;
-    let alt_irk = pairing_file
-        .alt_irk()
-        .ok_or_else(|| "The saved pairing record is missing its device identity.".to_string())?;
-    if !PeerDevice::validate_auth_tag(alt_irk, &service_identifier, &auth_tag) {
-        return Err("The discovered device did not match the paired iPhone.".to_string());
+    if verify_service_metadata {
+        let alt_irk = pairing_file.alt_irk().ok_or_else(|| {
+            "The saved pairing record is missing its device identity.".to_string()
+        })?;
+        if !PeerDevice::validate_auth_tag(alt_irk, &service_identifier, &auth_tag) {
+            return Err("The discovered device did not match the paired iPhone.".to_string());
+        }
     }
     check_location_cancellation(&cancellation)?;
 
@@ -610,7 +618,9 @@ async fn await_location_clear<E>(
 ) -> Result<(), String> {
     timeout(deadline, operation)
         .await
-        .map_err(|_| "The iPhone did not confirm stopping location simulation in time.".to_string())?
+        .map_err(|_| {
+            "The iPhone did not confirm stopping location simulation in time.".to_string()
+        })?
         .map_err(|_| "Roam Control could not confirm stopping location simulation.".to_string())
 }
 
@@ -746,18 +756,39 @@ mod restoration_tests {
 
     #[tokio::test]
     async fn clear_success_is_acknowledged() {
-        assert!(await_location_clear(std::future::ready(Ok::<(), ()>(())), Duration::from_millis(10)).await.is_ok());
+        assert!(
+            await_location_clear(
+                std::future::ready(Ok::<(), ()>(())),
+                Duration::from_millis(10)
+            )
+            .await
+            .is_ok()
+        );
     }
 
     #[tokio::test]
     async fn clear_error_is_not_success() {
-        assert_eq!(await_location_clear(std::future::ready(Err::<(), ()>(())), Duration::from_millis(10)).await.unwrap_err(),
-            "Roam Control could not confirm stopping location simulation.");
+        assert_eq!(
+            await_location_clear(
+                std::future::ready(Err::<(), ()>(())),
+                Duration::from_millis(10)
+            )
+            .await
+            .unwrap_err(),
+            "Roam Control could not confirm stopping location simulation."
+        );
     }
 
     #[tokio::test]
     async fn clear_has_a_deadline() {
-        assert_eq!(await_location_clear(std::future::pending::<Result<(), ()>>(), Duration::from_millis(1)).await.unwrap_err(),
-            "The iPhone did not confirm stopping location simulation in time.");
+        assert_eq!(
+            await_location_clear(
+                std::future::pending::<Result<(), ()>>(),
+                Duration::from_millis(1)
+            )
+            .await
+            .unwrap_err(),
+            "The iPhone did not confirm stopping location simulation in time."
+        );
     }
 }

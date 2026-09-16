@@ -62,7 +62,7 @@ agreement, or the amount of work invested in a contribution.
 2. Open `RoamControl.xcodeproj`.
 3. Choose your own signing team in Xcode. Do not commit it.
 4. Use the simulator for interface work and a physical iPhone for pairing or location-session work.
-5. Install and enable LocalDevVPN on the test iPhone.
+5. Install and enable LocalDevVPN when testing that transport, or configure a reachable Remote Endpoint for the remote transport.
 
 The prebuilt `RoamPairingFFI.xcframework` allows normal app builds without compiling Rust. If the native bridge changes, follow `Documentation/BuildAndRelease.md` to rebuild both framework slices.
 

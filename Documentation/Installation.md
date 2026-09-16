@@ -6,7 +6,8 @@ Roam Control is not distributed through the App Store or TestFlight. Public beta
 
 - An iPhone running iOS 27 or newer.
 - Developer Mode enabled under **Settings → Privacy & Security**.
-- [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) installed on the iPhone.
+- A valid RPPairing file. First-time on-device pairing may still use LocalDevVPN; Remote Endpoint mode requires importing an existing pairing file.
+- [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) for LocalDevVPN mode, or a router endpoint reachable from the iPhone for Remote Endpoint mode.
 - SideStore, or Xcode on a Mac with an Apple development team.
 
 ## Install with SideStore
@@ -14,8 +15,12 @@ Roam Control is not distributed through the App Store or TestFlight. Public beta
 1. Download the IPA attached to the matching GitHub Release. Do not download an IPA from an untrusted mirror.
 2. In SideStore, tap **+** and choose the downloaded IPA.
 3. Allow SideStore to sign and install Roam Control with your Apple account.
-4. Open Roam Control and complete its introduction and device-pairing flow.
-5. Open LocalDevVPN and enable its local tunnel before starting a location.
+4. Open Roam Control and complete its introduction. Pair this iPhone through LocalDevVPN, or import an existing RPPairing file from Device Setup.
+5. Open **Settings → Device → Connection Mode**. Use LocalDevVPN with its tunnel, or choose Remote Endpoint and keep LocalDevVPN off.
+
+## Remote Endpoint mode
+
+Remote Endpoint mode reaches the iPhone's RPPairing service through the router's TCP hairpin path. The default endpoint is `192.168.31.1:49152`; the router must forward the subsequent TCP high ports back to this iPhone. The pairing file stays on the iPhone and is never copied to the router.
 
 Free Apple accounts normally require sideloaded apps to be refreshed within seven days and limit the number of simultaneously active apps/App IDs. These are Apple signing limits, not Roam Control subscriptions.
 

@@ -338,7 +338,7 @@ struct LocationSelectionCard: View {
         case .openingLocalDevVPN:
             return "Roam Control will return automatically after the tunnel starts."
         case .discovering:
-            return "Finding the paired iPhone through the private local tunnel."
+            return "Finding the paired iPhone through the selected connection."
         case .connecting:
             return "Opening the secure location session."
         case .active(let target):

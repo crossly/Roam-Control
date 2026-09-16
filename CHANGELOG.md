@@ -6,6 +6,12 @@ All notable public changes to Roam Control are recorded here.
 
 Roam Control 0.9.2 Preview - Build 58. Public validation preview; Beta 6 / Build 57 remains the recommended release until validation.
 
+### Added
+
+- Added **Settings → Device → Connection Mode** with LocalDevVPN and Remote Endpoint transports.
+- Added configurable Remote Endpoint address and port, defaulting to `192.168.31.1:49152`.
+- Added mode-aware Connection Health checks and copied diagnostics.
+
 ### Fixed
 
 - Build 58: derive pairing and location continued-processing task prefixes only from the runtime bundle identifier; require the exact runtime-rooted permitted wildcard and stop before registration when it is missing. Remove cross-bundle fallback and development-team plist variants. Preserve Build 57 telemetry and the existing immediate-failure scheduling strategy.

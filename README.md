@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/License-PolyForm%20NC%201.0.0-blue" alt="PolyForm Noncommercial 1.0.0">
 </p>
 
-Roam Control is a source-available SwiftUI app for location-based development, quality assurance and responsible personal testing on an iPhone you own and control. It supports fixed locations, walking routes, favourites, history, native on-device pairing and LocalDevVPN-compatible sessions.
+Roam Control is a source-available SwiftUI app for location-based development, quality assurance and responsible personal testing on an iPhone you own and control. It supports fixed locations, walking routes, favourites, history, native on-device pairing and LocalDevVPN or Remote Endpoint sessions.
 
 ## Screenshots
 
@@ -52,7 +52,7 @@ Roam Control is a source-available SwiftUI app for location-based development, q
 - Save named favourites and revisit recent locations.
 - Restore the real location explicitly when testing is finished.
 - Recover safely after an interrupted fixed or walking session.
-- Follow separate, guided LocalDevVPN flows for Wi-Fi and mobile data.
+- Use LocalDevVPN for the original on-device flow, or a configured Remote Endpoint without opening LocalDevVPN.
 - Choose automatic, light or dark appearance and standard, satellite or hybrid maps.
 - Use Dynamic Type, VoiceOver and Reduce Motion.
 
@@ -112,7 +112,7 @@ Normal builds use the included `Frameworks/RoamPairingFFI.xcframework`. The fram
 
 ## How it works
 
-Roam Control generates or imports an RPPairing record for the same iPhone and stores it in the device-only Keychain. When a location starts, it discovers that iPhone's remote-pairing service through LocalDevVPN, verifies the device identity and opens the encrypted developer session used to set or clear a simulated location.
+Roam Control generates or imports an RPPairing record for the same iPhone and stores it in the device-only Keychain. When a location starts, LocalDevVPN mode discovers the iPhone's remote-pairing service through the private tunnel; Remote Endpoint mode connects to the configured router endpoint directly. Both modes verify the device and open the encrypted developer session used to set or clear a simulated location.
 
 The native engine is a narrow Rust-to-Swift bridge around the MIT-licensed [`idevice`](https://github.com/jkcoxson/idevice) library, pinned to an exact revision.
 

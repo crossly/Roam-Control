@@ -534,6 +534,8 @@ enum FailureStage: String, CaseIterable {
         case "LocalDevVPN returned an invalid device address.",
              "LocalDevVPN did not make the iPhone connection available in time.",
              "Roam Control could not reach the iPhone through LocalDevVPN.",
+             "The configured remote endpoint is not reachable.",
+             "The configured remote endpoint could not complete the device session.",
              "Install LocalDevVPN before starting a location session.": return .vpnConnection
         case "The paired iPhone did not respond in time.",
              "The iPhone rejected the saved pairing session.",

@@ -27,18 +27,67 @@ enum ActiveLocationUpdateResult: Equatable {
     case failed
 }
 
+enum DeviceSessionConnectionStage: Equatable, Sendable {
+    case idle
+    case choosingNetwork
+    case openingLocalDevVPN
+    case discoveringDevice
+    case connectingRemoteEndpoint
+    case verifyingDevice
+    case waitingForSystem
+    case openingSecureSession
+    case active
+    case restoringRealLocation
+    case failed
+
+    var title: String {
+        switch self {
+        case .idle: "Idle"
+        case .choosingNetwork: "Checking network"
+        case .openingLocalDevVPN: "Opening LocalDevVPN"
+        case .discoveringDevice: "Discovering this iPhone"
+        case .connectingRemoteEndpoint: "Connecting to Remote Endpoint"
+        case .verifyingDevice: "Verifying paired device"
+        case .waitingForSystem: "Waiting for system resources"
+        case .openingSecureSession: "Opening secure session"
+        case .active: "Location session active"
+        case .restoringRealLocation: "Restoring real location"
+        case .failed: "Connection failed"
+        }
+    }
+}
+
+enum DeviceEndpointSource: Equatable, Sendable {
+    case discovered
+    case fallback
+    case configured
+
+    var title: String {
+        switch self {
+        case .discovered: "Discovered automatically"
+        case .fallback: "Default address fallback"
+        case .configured: "Configured remote endpoint"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class LocalDeviceSessionCoordinator: NSObject {
+    private let configuration: ConnectionConfiguration
+
     private struct PendingSession {
         let pairingRecord: Data
         let target: LocationTarget
     }
 
     private struct RemotePairingService: Sendable {
+        let host: String
         let port: UInt16
         let identifier: String
         let authTag: String
+        let endpointSource: DeviceEndpointSource
+        let fallbackHost: String?
     }
 
     private static let localDevVPNPeerAddress = "10.7.0.1"
@@ -67,6 +116,10 @@ final class LocalDeviceSessionCoordinator: NSObject {
         }
     }
     let backgroundKeepAlive = BackgroundLocationKeepAlive()
+    private(set) var connectionStage: DeviceSessionConnectionStage = .idle
+    private(set) var endpointSource: DeviceEndpointSource?
+    private(set) var lastFailureMessage: String?
+
     var onBackgroundEvent: ((UsageAnalyticsEvent, BackgroundSessionTelemetry) -> Void)?
     var backgroundTelemetry: BackgroundSessionTelemetry {
         BackgroundSessionTelemetry(
@@ -142,9 +195,12 @@ final class LocalDeviceSessionCoordinator: NSObject {
     private var workerIsRunning = false
     private var cancellationRequested = false
     private var pendingFailureMessage: String?
+    private var sessionMode: DeviceConnectionMode?
+
     private var restorationDisplayStartDate: Date?
 
-    override init() {
+    init(configuration: ConnectionConfiguration) {
+        self.configuration = configuration
         super.init()
         backgroundKeepAlive.onChange = { [weak self] in
             guard let self else { return }
@@ -182,12 +238,20 @@ final class LocalDeviceSessionCoordinator: NSObject {
         lastFailureDisposition = nil
         restorationStatus = "Not requested"
         vpnReturnRetryUsed = false
+        sessionMode = configuration.mode
+
 
 #if targetEnvironment(simulator)
-        phase = .failed("A real iPhone is required to start a location session.")
+        connectionStage = .failed
+        let message = "A real iPhone is required to start a location session."
+        lastFailureMessage = message
+        phase = .failed(message)
 #else
         cancellationRequested = false
         pendingFailureMessage = nil
+        lastFailureMessage = nil
+        endpointSource = nil
+        connectionStage = .choosingNetwork
         restorationDisplayStartDate = nil
         mobileDataGuidance = nil
         hasRequestedLocalDevVPNThisAttempt = false
@@ -200,6 +264,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
     }
 
     func handleOpenURL(_ url: URL) {
+        guard (sessionMode ?? configuration.mode) == .localDevVPN else { return }
         guard url.scheme?.lowercased() == "roamcontrol" else { return }
         guard pendingSession != nil else { return }
         guard phase == .openingLocalDevVPN || phase == .discovering else { return }
@@ -213,6 +278,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
             beginDiscovery(showConnectionHelpIfUnavailable: true)
         }
     }
+
 
     @discardableResult
     func updateLocation(_ target: LocationTarget) -> ActiveLocationUpdateResult {
@@ -233,10 +299,13 @@ final class LocalDeviceSessionCoordinator: NSObject {
             target: target
         )
         phase = .active(target)
+        connectionStage = .active
+
         return .updated
     }
 
     func openLocalDevVPN() {
+        guard configuration.mode == .localDevVPN else { return }
 #if !targetEnvironment(simulator)
         if pendingSession != nil, !workerIsRunning {
             openLocalDevVPNForPendingSession()
@@ -325,9 +394,11 @@ final class LocalDeviceSessionCoordinator: NSObject {
             cleanupDiscovery()
             clearPendingSession()
             phase = .idle
+            connectionStage = .idle
         case .connecting:
             cancellationRequested = true
             phase = .stopping
+            connectionStage = .restoringRealLocation
             if let activeSession {
                 rc_location_session_cancel(activeSession)
             }
@@ -336,6 +407,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
             restorationStatus = "Stop requested; awaiting device response"
             restorationDisplayStartDate = .now
             phase = .stopping
+            connectionStage = .restoringRealLocation
             if let activeSession {
                 rc_location_session_cancel(activeSession)
             }
@@ -344,16 +416,21 @@ final class LocalDeviceSessionCoordinator: NSObject {
         case .failed:
             clearPendingSession()
             phase = .idle
+            connectionStage = .idle
         }
     }
-
     func reset() {
         stop()
         if !workerIsRunning {
             clearPendingSession()
             phase = .idle
+            connectionStage = .idle
+            endpointSource = nil
+            lastFailureMessage = nil
+            sessionMode = nil
         }
     }
+
 
     // A cold VPN start can briefly expose services before the return to the app settles.
     // Retry once per start; never turn this into an unbounded recovery loop.
@@ -367,6 +444,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
         vpnReturnRetryUsed = true
         cleanupDiscovery()
         phase = .discovering
+        connectionStage = .discoveringDevice
         mobileDataGuidance = nil
         vpnReturnRetryTask = Task { @MainActor [weak self] in
             // Bound the foreground wait as well as the retry count.
@@ -397,6 +475,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
         sawNonMatchingService = false
         isDiscoveringServices = true
         phase = .discovering
+        connectionStage = .discoveringDevice
+
         browser.delegate = self
         browser.searchForServices(ofType: "_remotepairing._tcp.", inDomain: "local.")
 
@@ -497,11 +577,16 @@ final class LocalDeviceSessionCoordinator: NSObject {
         }
 
         guard serviceProbeConnection == nil, serviceProbeRetryTask == nil else { return }
+        connectionStage = .verifyingDevice
         verifyServiceIsReachable(RemotePairingService(
+            host: Self.localDevVPNPeerAddress,
             port: UInt16(service.port),
             identifier: identifier,
-            authTag: authTag
+            authTag: authTag,
+            endpointSource: .fallback,
+            fallbackHost: nil
         ))
+
     }
 
     private func submitLocationTask() {
@@ -510,6 +595,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
             return
         }
         phase = .connecting
+        connectionStage = .openingSecureSession
         observeLocationScheduler()
         // Scheduler observation never owns, delays or cancels the native worker.
         runNativeLocationSession()
@@ -567,7 +653,9 @@ final class LocalDeviceSessionCoordinator: NSObject {
         let contextBits = UInt(bitPattern: Unmanaged.passRetained(self).toOpaque())
         let pairingRecord = pendingSession.pairingRecord
         let target = pendingSession.target
-        let peerAddressString = Self.localDevVPNPeerAddress
+        let peerAddressString = resolvedService.host
+        let verifyServiceMetadata: Int32 = (sessionMode ?? configuration.mode) == .localDevVPN ? 1 : 0
+
 
         DispatchQueue.global(qos: .userInitiated).async {
             guard
@@ -592,6 +680,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
                                 resolvedService.port,
                                 serviceIdentifier,
                                 authTag,
+                                verifyServiceMetadata,
                                 target.latitude,
                                 target.longitude,
                                 locationStartedCallback,
@@ -624,6 +713,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
         mobileDataDiscoveryLoopTask = nil
         backgroundKeepAlive.start()
         phase = .active(target)
+        connectionStage = .active
+
         if let event = retryTelemetry.becameActive() {
             onConnectionEvent?(event)
         }
@@ -647,6 +738,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
             self.pendingFailureMessage = nil
             mobileDataGuidance = nil
             clearPendingSession()
+            lastFailureMessage = pendingFailureMessage
+            connectionStage = .failed
             phase = .failed(pendingFailureMessage)
             return
         }
@@ -657,6 +750,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
                message != "The location session was stopped." {
                 restorationStatus = "Stop not confirmed; real location unverified"
                 clearPendingSession()
+                lastFailureMessage = message
+                connectionStage = .failed
                 phase = .failed(message)
                 return
             }
@@ -672,6 +767,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
         case .success:
             mobileDataGuidance = nil
             clearPendingSession()
+            connectionStage = .idle
             phase = .idle
         case .failure(let message):
             if isRecoverableTunnelConnectionFailure(message) {
@@ -680,7 +776,10 @@ final class LocalDeviceSessionCoordinator: NSObject {
                 lastFailureDisposition = .recoverable
                 onRecoveryNeeded?(failureSnapshot(stage: stage, disposition: .recoverable))
                 resolvedService = nil
-                if isMobileDataStartupMode {
+
+                if (sessionMode ?? configuration.mode) == .remoteEndpoint {
+                    fail("The configured remote endpoint could not complete the device session.")
+                } else if isMobileDataStartupMode {
                     enterMobileDataGuidance()
                 } else if hasRequestedLocalDevVPNThisAttempt {
                     phase = .discovering
@@ -693,12 +792,16 @@ final class LocalDeviceSessionCoordinator: NSObject {
 
             mobileDataGuidance = nil
             clearPendingSession()
+            lastFailureMessage = message
+            connectionStage = .failed
             phase = .failed(message)
         }
     }
 
     private func fail(_ message: String) {
         backgroundKeepAlive.stop()
+        lastFailureMessage = message
+        connectionStage = .failed
         localDevVPNReturnTimeout?.cancel()
         localDevVPNReturnTimeout = nil
         mobileDataGuidance = nil
@@ -713,6 +816,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
 
         phase = .failed(message)
     }
+
+
 
     private func cleanupDiscovery() {
         vpnReturnRetryTask?.cancel()
@@ -749,7 +854,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
 
         serviceProbeAttemptCount += 1
         let connection = NWConnection(
-            host: NWEndpoint.Host(Self.localDevVPNPeerAddress),
+            host: NWEndpoint.Host(service.host),
             port: port,
             using: .tcp
         )
@@ -772,11 +877,15 @@ final class LocalDeviceSessionCoordinator: NSObject {
             }
         }
 
+        let probeTimeout: Duration = (sessionMode ?? configuration.mode) == .remoteEndpoint
+            ? .seconds(3)
+            : .milliseconds(900)
         serviceProbeTimeout = Task { @MainActor [weak self, weak connection] in
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: probeTimeout)
             guard !Task.isCancelled, let self, let connection else { return }
             self.finishServiceProbe(connection, service: service, reachable: false)
         }
+
         connection.start(queue: serviceProbeQueue)
     }
 
@@ -803,6 +912,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
         if reachable {
             serviceProbeAttemptCount = 0
             resolvedService = service
+            endpointSource = service.endpointSource
             mobileDataDiscoveryLoopTask?.cancel()
             mobileDataDiscoveryLoopTask = nil
             if mobileDataGuidance == .connectionHelp {
@@ -810,6 +920,12 @@ final class LocalDeviceSessionCoordinator: NSObject {
             }
             cleanupDiscovery()
             submitLocationTask()
+            return
+        }
+
+        if (sessionMode ?? configuration.mode) == .remoteEndpoint {
+            serviceProbeAttemptCount = 0
+            fail("The configured remote endpoint is not reachable.")
             return
         }
 
@@ -866,6 +982,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
         resolvedService = nil
         hasRequestedLocalDevVPNThisAttempt = false
         isMobileDataStartupMode = false
+        sessionMode = nil
     }
 
     private func finishCancelledLocationSession() {
@@ -875,6 +992,8 @@ final class LocalDeviceSessionCoordinator: NSObject {
 
         guard remaining > 0 else {
             phase = .idle
+            connectionStage = .idle
+
             return
         }
 
@@ -882,19 +1001,43 @@ final class LocalDeviceSessionCoordinator: NSObject {
             try? await Task.sleep(for: .seconds(remaining))
             guard let self, !self.workerIsRunning, self.phase == .stopping else { return }
             self.phase = .idle
+            self.connectionStage = .idle
+
         }
     }
 
     private func isRecoverableTunnelConnectionFailure(_ message: String) -> Bool {
         message.localizedCaseInsensitiveContains("through LocalDevVPN")
+            || message.localizedCaseInsensitiveContains("could not reach the iPhone through the selected connection")
             || message.localizedCaseInsensitiveContains("make the iPhone connection available")
-            || message.localizedCaseInsensitiveContains("open the secure device tunnel")
+            || message.localizedCaseInsensitiveContains("secure tunnel")
+    }
+
+
+    private func beginRemoteEndpointConnection() {
+        guard pendingSession != nil, !workerIsRunning else { return }
+        cleanupDiscovery()
+        phase = .discovering
+        connectionStage = .connectingRemoteEndpoint
+
+        verifyServiceIsReachable(RemotePairingService(
+            host: configuration.remoteHost,
+            port: configuration.remotePort,
+            identifier: "",
+            authTag: "",
+            endpointSource: .configured,
+            fallbackHost: nil
+        ))
     }
 
     private func routeStartupForCurrentNetwork() {
         networkDecisionTask?.cancel()
         networkDecisionTask = nil
         mobileDataGuidance = nil
+        if (sessionMode ?? configuration.mode) == .remoteEndpoint {
+            beginRemoteEndpointConnection()
+            return
+        }
 
         if wifiPathStatusIsKnown {
             if isWiFiPathSatisfied {
@@ -929,6 +1072,7 @@ final class LocalDeviceSessionCoordinator: NSObject {
         guard pendingSession != nil, !workerIsRunning else { return }
         cleanupDiscovery()
         phase = .discovering
+        connectionStage = .discoveringDevice
         mobileDataGuidance = .turnOff
         startMobileDataDiscoveryLoop()
     }
@@ -960,12 +1104,15 @@ final class LocalDeviceSessionCoordinator: NSObject {
     }
 
     private func openLocalDevVPNForPendingSession() {
+        guard (sessionMode ?? configuration.mode) == .localDevVPN else { return }
+
 #if !targetEnvironment(simulator)
         guard pendingSession != nil, !workerIsRunning else { return }
         cleanupDiscovery()
         mobileDataGuidance = nil
         hasRequestedLocalDevVPNThisAttempt = true
         phase = .openingLocalDevVPN
+        connectionStage = .openingLocalDevVPN
 
         UIApplication.shared.open(Self.enableURL) { [weak self] opened in
             guard !opened else { return }

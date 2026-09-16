@@ -15,11 +15,17 @@ enum ConnectionCheckState: Equatable {
 final class ConnectionDiagnosticsCoordinator: NSObject {
     private let browser = NetServiceBrowser()
     private var pairingRecord: Data?
+    private var activeMode: DeviceConnectionMode = .localDevVPN
     private var discoveredServices: [NetService] = []
     private var timeoutTask: Task<Void, Never>?
     private var sawNonMatchingService = false
-    private var probeConnection: NWConnection?
-    private let probeQueue = DispatchQueue(label: "com.sean.roamcontrol.diagnostics-probe")
+    private var sawMatchingUnreachableService = false
+    private var serviceProbeConnection: NWConnection?
+    private var serviceProbeTimeout: Task<Void, Never>?
+    private let serviceProbeQueue = DispatchQueue(
+        label: "com.sean.roamcontrol.diagnostics-probe",
+        qos: .userInitiated
+    )
 
     private(set) var state: ConnectionCheckState = .notRun
     private(set) var lastChecked: Date?
@@ -30,10 +36,14 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
         browser.includesPeerToPeer = true
     }
 
-    func run(pairingRecord: Data?, sessionPhase: DeviceSessionPhase) {
+    func run(
+        pairingRecord: Data?,
+        sessionPhase: DeviceSessionPhase,
+        configuration: ConnectionConfiguration
+    ) {
         cancel(resetState: false)
 
-        guard let pairingRecord else {
+        guard pairingRecord != nil else {
             finish(.failed("This iPhone is not paired. Open Pairing & Connection and pair it first."))
             return
         }
@@ -49,12 +59,33 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
             break
         }
 
+        activeMode = configuration.mode
+
 #if targetEnvironment(simulator)
-        finish(.failed("LocalDevVPN reachability can only be checked on a physical iPhone."))
+        let message = configuration.mode == .remoteEndpoint
+            ? "Remote endpoint reachability can only be checked on a physical iPhone."
+            : "LocalDevVPN reachability can only be checked on a physical iPhone."
+        finish(.failed(message))
 #else
         self.pairingRecord = pairingRecord
         sawNonMatchingService = false
+        sawMatchingUnreachableService = false
         state = .running
+
+        if configuration.mode == .remoteEndpoint {
+            guard let port = NWEndpoint.Port(rawValue: configuration.remotePort) else {
+                finish(.failed("The configured remote endpoint has an invalid port."))
+                return
+            }
+            probe(
+                host: configuration.remoteHost,
+                port: port,
+                fallbackHost: nil,
+                successMessage: "The configured remote endpoint is reachable."
+            )
+            return
+        }
+
         browser.delegate = self
         browser.searchForServices(ofType: "_remotepairing._tcp.", inDomain: "local.")
 
@@ -62,7 +93,11 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled, let self, self.state == .running else { return }
 
-            if self.sawNonMatchingService {
+            if self.sawMatchingUnreachableService {
+                self.finish(.failed(
+                    "The paired iPhone was announced, but its LocalDevVPN address was not reachable. Reconnect LocalDevVPN and check that the tunnel is enabled."
+                ))
+            } else if self.sawNonMatchingService {
                 self.finish(.failed(
                     "LocalDevVPN is visible, but its device announcement does not match the paired iPhone. Toggle LocalDevVPN off and on, then try again."
                 ))
@@ -80,11 +115,13 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
     }
 
     private func cancel(resetState: Bool) {
-        probeConnection?.stateUpdateHandler = nil
-        probeConnection?.cancel()
-        probeConnection = nil
         timeoutTask?.cancel()
         timeoutTask = nil
+        serviceProbeTimeout?.cancel()
+        serviceProbeTimeout = nil
+        serviceProbeConnection?.stateUpdateHandler = nil
+        serviceProbeConnection?.cancel()
+        serviceProbeConnection = nil
         browser.stop()
 
         for service in discoveredServices {
@@ -97,6 +134,7 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
         discoveredServices = []
         pairingRecord = nil
         sawNonMatchingService = false
+        sawMatchingUnreachableService = false
 
         if resetState, state == .running {
             state = .notRun
@@ -152,36 +190,125 @@ final class ConnectionDiagnosticsCoordinator: NSObject {
         }
 
         if matchesPairedDevice {
-            verifyReachability(port: UInt16(service.port))
+            probe(service)
         } else {
             sawNonMatchingService = true
         }
     }
 
-    private func verifyReachability(port: UInt16) {
-        guard probeConnection == nil, let endpointPort = NWEndpoint.Port(rawValue: port) else { return }
-        let connection = NWConnection(host: "10.7.0.1", port: endpointPort, using: .tcp)
-        probeConnection = connection
-        connection.stateUpdateHandler = { [weak self, weak connection] state in
-            Task { @MainActor [weak self, weak connection] in
-                guard let self, let connection,
-                      self.state == .running, self.probeConnection === connection else { return }
-                switch state {
-                case .ready:
-                    self.finish(.passed("This iPhone's pairing service is reachable through LocalDevVPN. Secure session verification happens when you start a location session."))
-                case .failed:
-                    self.finish(.failed("The device announcement matches, but its pairing service could not be reached through LocalDevVPN. Toggle the tunnel off and on, then try again."))
-                default:
-                    break
+    private func probe(_ service: NetService) {
+        guard serviceProbeConnection == nil else { return }
+        guard
+            service.port <= Int(UInt16.max),
+            let port = NWEndpoint.Port(rawValue: UInt16(service.port))
+        else {
+            sawMatchingUnreachableService = true
+            return
+        }
+
+        probe(
+            host: "10.7.0.1",
+            port: port,
+            fallbackHost: nil,
+            successMessage: "The pairing record is valid and this iPhone is reachable through LocalDevVPN."
+        )
+    }
+
+    private func probe(
+        host: String,
+        port: NWEndpoint.Port,
+        fallbackHost: String?,
+        successMessage: String
+    ) {
+        guard serviceProbeConnection == nil else { return }
+
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: port, using: .tcp)
+        serviceProbeConnection = connection
+        connection.stateUpdateHandler = { [weak self, weak connection] connectionState in
+            guard let connection else { return }
+            switch connectionState {
+            case .ready:
+                Task { @MainActor [weak self] in
+                    self?.finishProbe(
+                        connection,
+                        reachable: true,
+                        port: port,
+                        fallbackHost: fallbackHost,
+                        successMessage: successMessage
+                    )
                 }
+            case .failed, .cancelled:
+                Task { @MainActor [weak self] in
+                    self?.finishProbe(
+                        connection,
+                        reachable: false,
+                        port: port,
+                        fallbackHost: fallbackHost,
+                        successMessage: successMessage
+                    )
+                }
+            case .setup, .waiting, .preparing:
+                break
+            @unknown default:
+                break
             }
         }
-        connection.start(queue: probeQueue)
+
+        let probeTimeout: Duration = activeMode == .remoteEndpoint ? .seconds(3) : .seconds(2)
+        serviceProbeTimeout = Task { @MainActor [weak self, weak connection] in
+            try? await Task.sleep(for: probeTimeout)
+            guard !Task.isCancelled, let self, let connection else { return }
+            self.finishProbe(
+                connection,
+                reachable: false,
+                port: port,
+                fallbackHost: fallbackHost,
+                successMessage: successMessage
+            )
+        }
+        connection.start(queue: serviceProbeQueue)
+    }
+
+    private func finishProbe(
+        _ connection: NWConnection,
+        reachable: Bool,
+        port: NWEndpoint.Port,
+        fallbackHost: String?,
+        successMessage: String
+    ) {
+        guard serviceProbeConnection === connection else { return }
+        serviceProbeTimeout?.cancel()
+        serviceProbeTimeout = nil
+        serviceProbeConnection = nil
+        connection.stateUpdateHandler = nil
+        connection.cancel()
+
+        if reachable {
+            finish(.passed(successMessage))
+        } else if let fallbackHost {
+            probe(
+                host: fallbackHost,
+                port: port,
+                fallbackHost: nil,
+                successMessage: successMessage
+            )
+        } else if activeMode == .remoteEndpoint {
+            finish(.failed("The configured remote endpoint is not reachable."))
+        } else {
+            sawMatchingUnreachableService = true
+        }
     }
 
     private func finish(_ newState: ConnectionCheckState) {
         cancel(resetState: false)
-        state = newState
+        switch newState {
+        case .passed(let message):
+            state = .passed(NSLocalizedString(message, comment: ""))
+        case .failed(let message):
+            state = .failed(NSLocalizedString(message, comment: ""))
+        case .notRun, .running:
+            state = newState
+        }
         lastChecked = Date()
     }
 }

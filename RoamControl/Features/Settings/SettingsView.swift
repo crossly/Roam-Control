@@ -40,6 +40,22 @@ struct SettingsView: View {
 
                 Section("Device") {
                     NavigationLink {
+                        ConnectionConfigurationView()
+                            .environment(appModel)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Connection Mode")
+                                Text(appModel.connectionConfiguration.mode.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: appModel.connectionConfiguration.mode.systemImage)
+                        }
+                    }
+
+                    NavigationLink {
                         ConnectionHealthView()
                             .environment(appModel)
                     } label: {

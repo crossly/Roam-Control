@@ -19,7 +19,19 @@ else
     exit 1
 fi
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+if [[ -z "${DEVELOPER_DIR:-}" ]]; then
+    if [[ -d "/Applications/Xcode-beta.app/Contents/Developer" ]]; then
+        export DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"
+    else
+        export DEVELOPER_DIR="$(xcode-select -p 2>/dev/null || true)"
+    fi
+fi
+
+if [[ ! -x "${DEVELOPER_DIR}/usr/bin/xcodebuild" ]]; then
+    print -u2 "A full Xcode installation is required. Set DEVELOPER_DIR to its Contents/Developer path."
+    exit 1
+fi
+
 export CARGO_TARGET_DIR="${BUILD_DIR}/target"
 
 mkdir -p "${BUILD_DIR}" "${PROJECT_ROOT}/Frameworks"

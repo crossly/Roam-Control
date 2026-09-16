@@ -22,6 +22,16 @@ Use this checklist before packaging an IPA or declaring a development build stab
 - [ ] An invalid record produces a readable error.
 - [ ] Removing pairing requires confirmation and returns the app to Not paired.
 
+## Connection mode
+
+- [ ] In Settings → Device, Connection Mode appears above Connection Health.
+- [ ] LocalDevVPN and Remote Endpoint can be switched; a new installation defaults to LocalDevVPN.
+- [ ] Remote Endpoint defaults to `192.168.31.1:49152` and rejects invalid IP addresses and ports with readable errors.
+- [ ] With LocalDevVPN disconnected, Remote Endpoint mode checks the configured endpoint directly.
+- [ ] A failed Remote Endpoint probe reports a clear error and does not open or fall back to LocalDevVPN.
+- [ ] A valid RPPairing file can establish RPPairing, the dynamic tunnel, RSD and LocationSimulation through Remote Endpoint.
+- [ ] Remote Endpoint mode supports location updates, Stop & Restore and interrupted-session recovery.
+
 ## Map and search
 
 - [ ] Live suggestions appear after two or more characters.
@@ -94,7 +104,7 @@ Use this checklist before packaging an IPA or declaring a development build stab
 
 - [ ] Automatic, Light and Dark update the Settings screen immediately.
 - [ ] Standard, Satellite and Hybrid update the map.
-- [ ] Connection Health reports pairing, LocalDevVPN and location-session state accurately.
+- [ ] Connection Health reports the selected mode, endpoint, pairing and location-session state accurately.
 - [ ] Feedback links open the correct Bug Report and Feature Request forms.
 - [ ] Share Diagnostics opens the iOS share sheet and contains no keys or PINs.
 - [ ] About Roam Control describes the current controls and flows.
@@ -112,7 +122,7 @@ Use this checklist before packaging an IPA or declaring a development build stab
 - [ ] A self-hosted-only build sends only to the self-hosted endpoint; a TelemetryDeck-only build sends only to TelemetryDeck; a fully configured build sends to both.
 - [ ] Usage events never contain coordinates, place names, searches, routes, pairing data or diagnostics.
 - [ ] The built app contains `PrivacyInfo.xcprivacy` with tracking disabled.
-- [ ] Reset Roam Control clears app data, returns to onboarding and does not alter LocalDevVPN.
+- [ ] Reset Roam Control clears app data, restores LocalDevVPN and the default remote endpoint, returns to onboarding and does not alter LocalDevVPN.
 
 ## Accessibility and layout
 

@@ -49,6 +49,15 @@ Only rebuild it after changing `Native/RoamPairingFFI`. The rebuild requires Rus
 
 Run `scripts/build-pairing-engine.sh` from the project directory. Confirm the app still builds for both a physical iPhone and the simulator afterwards.
 
+## Connection-mode validation
+
+The release checklist must cover both transports:
+
+- LocalDevVPN mode: the original on-device tunnel, mDNS discovery and `10.7.0.1` fallback remain functional.
+- Remote Endpoint mode: **Settings → Device → Connection Mode** selects `Remote Endpoint`; the default endpoint is `192.168.31.1:49152`; LocalDevVPN remains disconnected; Connection Health reports the configured endpoint as reachable; and a fixed-location session reaches LocationSimulation through the router hairpin path.
+
+Remote Endpoint mode requires an existing valid RPPairing file. The router forwards encrypted TCP traffic only; never copy the pairing file into the router or the repository.
+
 ## Archive preparation
 
 Before creating an archive:
