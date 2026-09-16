@@ -2,6 +2,10 @@
 
 All notable public changes to Roam Control are recorded here.
 
+## [Unreleased]
+
+No changes yet.
+
 ## [0.10.0] - 2026-09-16
 
 Remote Endpoint preview release, corresponding to app version 0.10.0 Build 62.

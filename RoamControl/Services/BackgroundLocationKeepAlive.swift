@@ -12,6 +12,21 @@ struct BackgroundSessionTelemetry: Sendable {
 enum BackgroundKeepAliveStatus: String, Sendable {
     case idle, awaitingAuthorization, starting, receivingUpdates, denied, restricted
     case servicesDisabled, missingBackgroundMode, locationUnavailable, failed, stopped
+    var title: String {
+        switch self {
+        case .idle, .stopped: "Inactive"
+        case .awaitingAuthorization: "Waiting for permission"
+        case .starting: "Starting"
+        case .receivingUpdates: "Receiving updates"
+        case .denied: "Permission denied"
+        case .restricted: "Restricted"
+        case .servicesDisabled: "Location Services disabled"
+        case .missingBackgroundMode: "Background mode missing"
+        case .locationUnavailable: "Location unavailable"
+        case .failed: "Failed"
+        }
+    }
+
 }
 
 /// Receives updates solely to maintain an active session. Coordinates are never
