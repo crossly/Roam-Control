@@ -96,28 +96,38 @@ struct PairingSetupView: View {
             } else {
                 pairingProgress
 
-                if appModel.onDevicePairing.isAvailableOnThisDevice {
-                    if appModel.onDevicePairing.isRunning {
-                        Button("Cancel Pairing", role: .cancel) {
-                            appModel.cancelOnDevicePairing()
+                if appModel.connectionConfiguration.mode == .localDevVPN {
+                    if appModel.onDevicePairing.isAvailableOnThisDevice {
+                        if appModel.onDevicePairing.isRunning {
+                            Button("Cancel Pairing", role: .cancel) {
+                                appModel.cancelOnDevicePairing()
+                            }
+                            .buttonStyle(.bordered)
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            Button {
+                                appModel.startOnDevicePairing()
+                            } label: {
+                                Label("Pair This iPhone", systemImage: "iphone.and.arrow.forward")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .disabled(isBusy)
                         }
-                        .buttonStyle(.bordered)
-                        .frame(maxWidth: .infinity)
                     } else {
-                        Button {
-                            appModel.startOnDevicePairing()
-                        } label: {
-                            Label("Pair This iPhone", systemImage: "iphone.and.arrow.forward")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(isBusy)
+                        Label("On-device pairing needs your physical iPhone.", systemImage: "iphone")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 } else {
-                    Label("On-device pairing needs your physical iPhone.", systemImage: "iphone")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        "Remote Endpoint mode requires an existing RPPairing file. Import one before connecting.",
+                        systemImage: "network"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Button {
@@ -201,16 +211,26 @@ struct PairingSetupView: View {
                 .font(.headline)
 
             requirementRow(number: "1", text: "Pair this iPhone here, or import its existing RPPairing file.")
-            requirementRow(number: "2", text: "Install LocalDevVPN and switch it on.")
+            if appModel.connectionConfiguration.mode == .localDevVPN {
+                requirementRow(number: "2", text: "Install LocalDevVPN and switch it on.")
+
+                Link(destination: localDevVPNURL) {
+                    Label("View LocalDevVPN", systemImage: "arrow.up.right.square")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            } else {
+                requirementRow(number: "2", text: "Use the configured remote endpoint without opening LocalDevVPN.")
+
+                LabeledContent(
+                    "Remote Endpoint",
+                    value: appModel.connectionConfiguration.remoteEndpointDescription
+                )
+                .font(.subheadline.monospaced())
+            }
             requirementRow(number: "3", text: "Keep Developer Mode enabled on the iPhone.")
 
-            Link(destination: localDevVPNURL) {
-                Label("View LocalDevVPN", systemImage: "arrow.up.right.square")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-
-            Text("New on-device pairing is available on iOS 27. The simulator can test the screen, but Apple only exposes the real handshake on a physical iPhone.")
+            Text("New on-device pairing is available on iOS 27. The simulator can test the screen, but Apple only exposes the real handshake on a physical iPhone. Remote Endpoint mode uses an existing RPPairing file and the configured router path.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -387,11 +407,16 @@ struct PairingSetupView: View {
         case .importing:
             return "Validating the record and its keys."
         case .notPaired:
+            if appModel.connectionConfiguration.mode == .remoteEndpoint {
+                return "Import an existing RPPairing file before using Remote Endpoint mode."
+            }
             return appModel.onDevicePairing.isAvailableOnThisDevice
                 ? "Create the pairing securely on this iPhone, or import an existing file."
                 : "Connect your physical iPhone to create the pairing, or import an existing file."
         case .paired:
-            return "Roam Control can use this record when the LocalDevVPN session layer is connected."
+            return appModel.connectionConfiguration.mode == .remoteEndpoint
+                ? "Roam Control can use this record through the configured remote endpoint."
+                : "Roam Control can use this record when the LocalDevVPN session layer is connected."
         case .failed(let message):
             return message
         }

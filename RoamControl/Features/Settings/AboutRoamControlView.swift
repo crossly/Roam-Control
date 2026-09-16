@@ -56,7 +56,7 @@ struct AboutRoamControlView: View {
                 guideRow(
                     "Start Location",
                     symbol: "location.fill",
-                    text: "Start reporting the selected place as this iPhone’s location. LocalDevVPN must be connected."
+                    text: "Start reporting the selected place as this iPhone’s location through LocalDevVPN or the configured Remote Endpoint."
                 )
                 guideRow(
                     "Update Location",
@@ -122,7 +122,7 @@ struct AboutRoamControlView: View {
                 guideRow(
                     "Pairing & Connection",
                     symbol: "iphone.and.arrow.forward",
-                    text: "Pair this iPhone once so Roam Control can identify it through LocalDevVPN."
+                    text: "Pair this iPhone once so Roam Control can identify it through the selected connection."
                 )
                 guideRow(
                     "Connection Health",
@@ -184,7 +184,7 @@ struct AboutRoamControlView: View {
     private var quickStart: some View {
         Section {
             stepRow(1, "Pair this iPhone once.")
-            stepRow(2, "Connect LocalDevVPN.")
+            stepRow(2, "Choose LocalDevVPN or Remote Endpoint.")
             stepRow(3, "Search, choose or drop a location.")
             stepRow(4, "Start a fixed location or preview a walking route.")
         } header: {

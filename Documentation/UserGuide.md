@@ -4,20 +4,28 @@ Roam Control lets you choose where your iPhone reports its location. You can hol
 
 ## First-time setup
 
-You need your physical iPhone, Developer Mode and LocalDevVPN.
+You need your physical iPhone, Developer Mode and a valid RPPairing file.
 
 1. Open Roam Control and complete the four-page introduction.
-2. On **Device Setup**, tap **Pair This iPhone**.
-3. Allow Local Network access when iOS asks.
-4. Open **Settings → Privacy & Security → Developer Mode → Pair with Roam Control**.
+2. On **Device Setup**, pair this iPhone through LocalDevVPN, or import an existing RPPairing file.
+3. If using on-device pairing, allow Local Network access when iOS asks.
+4. If using on-device pairing, open **Settings → Privacy & Security → Developer Mode → Pair with Roam Control**.
 5. Enter the six-digit code shown by Roam Control.
-6. Install LocalDevVPN from the Device Setup screen if it is not already installed.
-7. Open LocalDevVPN and connect its local tunnel.
+6. Choose a connection mode under **Settings → Device → Connection Mode**.
 
 Pairing is normally required only once. Roam Control stores the pairing record in this iPhone's Keychain and does not upload it.
 
-## Choose a location
+## Connection modes
 
+Open **Settings → Device → Connection Mode** and choose one of:
+
+- **LocalDevVPN**: use the original on-device LocalDevVPN loopback tunnel.
+- **Remote Endpoint**: connect through the configured router endpoint without opening LocalDevVPN. The default is `192.168.31.1:49152`.
+
+Remote Endpoint mode requires an existing valid RPPairing file. The router only forwards encrypted RPPairing/CDTunnel traffic; the pairing file stays on the iPhone.
+
+
+## Choose a location
 Use any of these methods:
 
 - Type a place into the search box and choose a live result.
@@ -32,7 +40,7 @@ Choosing a search result clears the search box automatically. The close button o
 
 1. Choose the location.
 2. Tap **Start Location**.
-3. Follow the LocalDevVPN guidance if it appears.
+3. Follow the selected connection-mode guidance if it appears.
 4. Wait for the status to show that the location is active.
 
 There is no separate confirmation step after choosing a location.
@@ -41,7 +49,7 @@ To move an active session, choose another place and tap **Update Location**. Roa
 
 Tap **Stop & Restore** when you want iOS to return to the real location, then confirm the choice. Keep Roam Control open while it restores the real location. Roam Control deliberately does not place a stop control in the Dynamic Island, which helps prevent accidental stops while using another app.
 
-## Wi-Fi connection flow
+## LocalDevVPN Wi-Fi connection flow
 
 When Wi-Fi is connected, Roam Control looks for the iPhone through LocalDevVPN immediately.
 
@@ -51,7 +59,13 @@ When Wi-Fi is connected, Roam Control looks for the iPhone through LocalDevVPN i
 
 Do not choose **I'm Using Mobile Data** while connected to Wi-Fi.
 
-## Mobile-data connection flow
+## Remote Endpoint connection flow
+
+With Remote Endpoint selected, Roam Control connects directly to the configured router endpoint and does not open or fall back to LocalDevVPN. The default is `192.168.31.1:49152`; the router must forward the subsequent TCP high ports back to this iPhone.
+
+If the endpoint is unavailable, verify the router address, port and network path under **Settings → Device → Connection Mode**.
+
+## LocalDevVPN mobile-data connection flow
 
 When the iPhone is using 4G or 5G:
 
@@ -135,7 +149,7 @@ Open **Settings → Privacy → What Is Shared** for the same disclosure inside 
 - **Replay Introduction** shows onboarding without deleting anything.
 - **Reset Roam Control** removes pairing, favourites, history and preferences, then returns to onboarding.
 - Reset also removes the anonymous statistics identifier.
-- Resetting Roam Control does not uninstall or reconfigure LocalDevVPN.
+- Resetting Roam Control restores the connection mode to LocalDevVPN and the default remote endpoint; it does not uninstall or reconfigure LocalDevVPN.
 
 ## Troubleshooting
 
@@ -146,6 +160,10 @@ Check whether you are using Wi-Fi or mobile data. On Wi-Fi, tap **Try Again**. O
 ### The discovered device does not match the paired iPhone
 
 The saved pairing record belongs to a different device announcement. Toggle LocalDevVPN off and on. If the problem remains, open Device Setup, remove the pairing and pair this iPhone again.
+
+### Remote Endpoint is not reachable
+
+Open **Settings → Device → Connection Mode** and verify the endpoint is `192.168.31.1:49152` for the default home-router setup. Confirm that the iPhone can reach the router and that the router forwards TCP `49152-65535` back to this iPhone. Remote Endpoint mode does not fall back to LocalDevVPN automatically.
 
 ### The real location is not visible after stopping
 

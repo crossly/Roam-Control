@@ -50,7 +50,7 @@
 		<string>_remotepairing._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Roam Control uses the local network to securely pair with and control this iPhone through LocalDevVPN.</string>
+	<string>Roam Control uses the local network to securely pair with and control this iPhone through LocalDevVPN or a configured remote endpoint.</string>
 	<key>UIBackgroundModes</key>
 	<array><string>location</string></array>
 	<key>NSLocationWhenInUseUsageDescription</key>

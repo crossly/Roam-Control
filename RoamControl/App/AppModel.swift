@@ -39,6 +39,7 @@ final class AppModel {
 
     let pairingService: any PairingService
     let onDevicePairing: OnDevicePairingCoordinator
+    let connectionConfiguration: ConnectionConfiguration
     let deviceSession: LocalDeviceSessionCoordinator
     private let usageAnalytics: UsageAnalyticsService
     let localDevVPNInstallURL = URL(string: "https://apps.apple.com/app/localdevvpn/id6755608044")!
@@ -49,9 +50,10 @@ final class AppModel {
     ) {
         self.pairingService = pairingService
         self.onDevicePairing = .shared
-        self.deviceSession = LocalDeviceSessionCoordinator()
-        self.usageAnalytics = UsageAnalyticsService(preferences: preferences)
         self.preferences = preferences
+        self.connectionConfiguration = ConnectionConfiguration(preferences: preferences)
+        self.deviceSession = LocalDeviceSessionCoordinator(configuration: self.connectionConfiguration)
+        self.usageAnalytics = UsageAnalyticsService(preferences: preferences)
         let hasCompletedOnboarding = preferences.bool(forKey: Self.onboardingKey)
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.favouriteLocations = Self.locations(forKey: Self.favouritesKey, in: preferences)
@@ -244,6 +246,7 @@ final class AppModel {
         } else {
             preferences.removeObject(forKey: Self.onboardingKey)
         }
+        connectionConfiguration.reset()
 
         selectedTarget = nil
         favouriteLocations = []

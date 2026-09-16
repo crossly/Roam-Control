@@ -9,18 +9,18 @@
 </p>
 
 <p align="center">
-  <strong>Public beta preview:</strong> 0.9.2 Build 61 · <strong>Requires:</strong> iOS 27+
+  <strong>Public beta preview:</strong> 0.10.0 Build 62 · <strong>Requires:</strong> iOS 27+
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-27%2B-blue" alt="iOS 27+">
   <img src="https://img.shields.io/badge/UI-SwiftUI-orange" alt="SwiftUI">
-  <img src="https://img.shields.io/badge/Preview-Build%2061-purple" alt="Build 61 Preview">
-  <img src="https://img.shields.io/badge/Current-Build%2061-lightgrey" alt="Current Build 61">
+  <img src="https://img.shields.io/badge/Preview-Build%2062-purple" alt="Build 62 Preview">
+  <img src="https://img.shields.io/badge/Current-Build%2062-lightgrey" alt="Current Build 62">
   <img src="https://img.shields.io/badge/License-PolyForm%20NC%201.0.0-blue" alt="PolyForm Noncommercial 1.0.0">
 </p>
 
-Roam Control is a source-available SwiftUI app for location-based development, quality assurance and responsible personal testing on an iPhone you own and control. It supports fixed locations, walking routes, favourites, history, native on-device pairing and LocalDevVPN-compatible sessions.
+Roam Control is a source-available SwiftUI app for location-based development, quality assurance and responsible personal testing on an iPhone you own and control. It supports fixed locations, walking routes, favourites, history, native on-device pairing and LocalDevVPN or Remote Endpoint sessions.
 
 ## Screenshots
 
@@ -52,21 +52,22 @@ Roam Control is a source-available SwiftUI app for location-based development, q
 - Save named favourites and revisit recent locations.
 - Restore the real location explicitly when testing is finished.
 - Recover safely after an interrupted fixed or walking session.
-- Follow separate, guided LocalDevVPN flows for Wi-Fi and mobile data.
+- Use the original LocalDevVPN flow, or connect through a configured Remote Endpoint without opening LocalDevVPN.
 - Choose automatic, light or dark appearance and standard, satellite or hybrid maps.
 - Use Dynamic Type, VoiceOver and Reduce Motion.
 
 ## Install the public beta
 
-Roam Control is not distributed through the App Store or TestFlight. The current public beta preview is **0.9.2 Build 61**. Download the `RoamControl-0.9.2-build61.ipa` attached to the [Build 61 release](https://github.com/seanhowarthdev/Roam-Control/releases/tag/v0.9.2-preview-build.61) and sign it with SideStore using your own Apple account.
+Roam Control is not distributed through the App Store or TestFlight. The current public beta preview is **0.10.0 Build 62**. Download the `RoamControl-0.10.0-build62.ipa` attached to the [Build 62 release](https://github.com/crossly/Roam-Control/releases/tag/v0.10.0-preview-build.62) and sign it with SideStore using your own Apple account.
 
-> **Current testers:** Build 61 supersedes Builds 56–60 for current beta testing. Earlier builds remain available for reference but should not be used for new installations.
+> **Current testers:** Build 62 adds the Remote Endpoint transport and supersedes Build 61 for testing this feature. Earlier builds remain available for reference.
 
 You will need:
 
 - An iPhone running iOS 27 or newer.
 - Developer Mode enabled.
-- [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044).
+- A valid RPPairing file, or LocalDevVPN for first-time on-device pairing.
+- [LocalDevVPN](https://apps.apple.com/app/localdevvpn/id6755608044) for LocalDevVPN mode, or a router endpoint reachable from the iPhone for Remote Endpoint mode.
 - SideStore, or Xcode on a Mac.
 
 Read the complete [installation guide](Documentation/Installation.md) before installing. Free Apple accounts remain subject to Apple's app-count and seven-day refresh limits.
@@ -75,11 +76,10 @@ Read the complete [installation guide](Documentation/Installation.md) before ins
 
 1. Install and open Roam Control.
 2. Complete the four-page introduction.
-3. Tap **Pair This iPhone** on Device Setup.
-4. Open **Settings → Privacy & Security → Developer Mode → Pair with Roam Control**.
-5. Enter the six-digit code shown in Roam Control.
-6. Install and connect LocalDevVPN.
-7. Choose a location or walking route.
+3. On Device Setup, tap **Pair This iPhone** for LocalDevVPN mode, or import an existing RPPairing file for Remote Endpoint mode.
+4. If pairing this iPhone, open **Settings → Privacy & Security → Developer Mode → Pair with Roam Control**.
+5. Enter the six-digit code shown in Roam Control when prompted.
+6. Choose LocalDevVPN or Remote Endpoint under Settings → Device → Connection Mode.
 
 The pairing record is stored in the iPhone Keychain and is never uploaded.
 
@@ -112,7 +112,7 @@ Normal builds use the included `Frameworks/RoamPairingFFI.xcframework`. The fram
 
 ## How it works
 
-Roam Control generates or imports an RPPairing record for the same iPhone and stores it in the device-only Keychain. When a location starts, it discovers that iPhone's remote-pairing service through LocalDevVPN, verifies the device identity and opens the encrypted developer session used to set or clear a simulated location.
+Roam Control generates or imports an RPPairing record for the same iPhone and stores it in the device-only Keychain. When a location starts, LocalDevVPN mode discovers the iPhone's remote-pairing service through the private tunnel; Remote Endpoint mode connects to the configured router endpoint directly. Both modes verify the device and open the encrypted developer session used to set or clear a simulated location.
 
 The native engine is a narrow Rust-to-Swift bridge around the MIT-licensed [`idevice`](https://github.com/jkcoxson/idevice) library, pinned to an exact revision.
 
@@ -124,7 +124,7 @@ The native engine is a narrow Rust-to-Swift bridge around the MIT-licensed [`ide
 - [Responsible use](Documentation/ResponsibleUse.md)
 - [Build and release guide](Documentation/BuildAndRelease.md)
 - [Regression checklist](Documentation/RegressionChecklist.md)
-- [0.9.2 release notes](https://github.com/seanhowarthdev/Roam-Control/releases/tag/v0.9.2)
+- [0.10.0 Remote Endpoint preview release notes](Documentation/Release-0.10.0.md)
 - [Beta 1 release notes](Documentation/PublicBetaRelease.md)
 - [Security policy](SECURITY.md)
 - [Third-party notices](Documentation/Licensing/THIRD_PARTY_NOTICES.md)

@@ -12,17 +12,35 @@ struct ConnectionHealthView: View {
         List {
             Section("Connection Health") {
                 healthRow(
+                    title: "Connection Mode",
+                    value: appModel.connectionConfiguration.mode.title,
+                    symbol: appModel.connectionConfiguration.mode.systemImage,
+                    color: .secondary
+                )
+
+                healthRow(
+                    title: appModel.connectionConfiguration.mode == .localDevVPN
+                        ? "LocalDevVPN"
+                        : "Remote Endpoint",
+                    value: connectionValue,
+                    symbol: connectionSymbol,
+                    color: connectionColor
+                )
+
+                if appModel.connectionConfiguration.mode == .remoteEndpoint {
+                    healthRow(
+                        title: "Endpoint",
+                        value: appModel.connectionConfiguration.remoteEndpointDescription,
+                        symbol: "network",
+                        color: .secondary
+                    )
+                }
+
+                healthRow(
                     title: "Pairing",
                     value: pairingValue,
                     symbol: pairingSymbol,
                     color: pairingColor
-                )
-
-                healthRow(
-                    title: "LocalDevVPN",
-                    value: localDevVPNValue,
-                    symbol: localDevVPNSymbol,
-                    color: localDevVPNColor
                 )
 
                 healthRow(
@@ -31,6 +49,40 @@ struct ConnectionHealthView: View {
                     symbol: sessionSymbol,
                     color: sessionColor
                 )
+
+                healthRow(
+                    title: "Background Session",
+                    value: backgroundSessionValue,
+                    symbol: backgroundSessionSymbol,
+                    color: backgroundSessionColor
+                )
+
+                healthRow(
+                    title: "Connection Stage",
+                    value: appModel.deviceSession.connectionStage.title,
+                    symbol: "point.3.connected.trianglepath.dotted",
+                    color: sessionColor
+                )
+
+                if let endpointSource = appModel.deviceSession.endpointSource {
+                    healthRow(
+                        title: "Device Address",
+                        value: endpointSource.title,
+                        symbol: "network",
+                        color: .secondary
+                    )
+                }
+
+                if case .active = appModel.deviceSession.phase,
+                   !appModel.deviceSession.backgroundKeepAlive.started {
+                    Label(
+                        "The current simulation can still work in the foreground, but background continuity is unavailable. Check Location access for Roam Control in Settings.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .accessibilityElement(children: .combine)
+                }
             }
 
             Section("Restoration") {
@@ -68,6 +120,24 @@ struct ConnectionHealthView: View {
                         .foregroundStyle(resultColor)
                 }
 
+                if let lastFailureMessage = appModel.deviceSession.lastFailureMessage {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Last session error", systemImage: "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Text(lastFailureMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(appModel.connectionConfiguration.mode == .localDevVPN
+                            ? "Check LocalDevVPN, then run the connection check or try starting the location again."
+                            : "Check the configured remote endpoint, then try starting the location again.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
                 if let lastChecked = diagnostics.lastChecked {
                     LabeledContent(
                         "Last checked",
@@ -79,7 +149,9 @@ struct ConnectionHealthView: View {
             } header: {
                 Text("Connection Check")
             } footer: {
-                Text("This checks the saved pairing record and whether the paired iPhone is visible through LocalDevVPN. It never starts, changes, or stops your location.")
+                Text(appModel.connectionConfiguration.mode == .localDevVPN
+                    ? "This checks the saved pairing record and whether the paired iPhone is visible through LocalDevVPN. It never starts, changes, or stops your location."
+                    : "This checks whether the configured remote endpoint is reachable. It never starts, changes, or stops your location.")
             }
 
             Section {
@@ -100,12 +172,23 @@ struct ConnectionHealthView: View {
             }
 
             Section("Other VPNs") {
-                Text("Another VPN may affect local device connections. If it is appropriate for your network, compare a test with that VPN paused. Keep LocalDevVPN enabled when starting a location session.")
+                if appModel.connectionConfiguration.mode == .localDevVPN {
+                    Text("Another VPN may affect local device connections. If it is appropriate for your network, compare a test with that VPN paused. Keep LocalDevVPN enabled when starting a location session.")
+                } else {
+                    Text("Remote Endpoint mode does not open or require LocalDevVPN. Another VPN may still affect whether the configured endpoint is reachable.")
+                }
                 Text("Roam Control has not detected another VPN. This is a troubleshooting check, not a diagnosis; an iOS scheduler rejection happens before the pairing connection starts.")
                     .foregroundStyle(.secondary)
             }
 
             Section("Help") {
+                NavigationLink {
+                    ConnectionConfigurationView()
+                        .environment(appModel)
+                } label: {
+                    Label("Connection Mode", systemImage: appModel.connectionConfiguration.mode.systemImage)
+                }
+
                 Button {
                     isShowingDeviceSetup = true
                 } label: {
@@ -113,8 +196,10 @@ struct ConnectionHealthView: View {
                 }
                 .foregroundStyle(.primary)
 
-                Link(destination: appModel.localDevVPNInstallURL) {
-                    Label("Open LocalDevVPN in App Store", systemImage: "arrow.up.right.square")
+                if appModel.connectionConfiguration.mode == .localDevVPN {
+                    Link(destination: appModel.localDevVPNInstallURL) {
+                        Label("Open LocalDevVPN in App Store", systemImage: "arrow.up.right.square")
+                    }
                 }
             }
         }
@@ -169,7 +254,7 @@ struct ConnectionHealthView: View {
         }
     }
 
-    private var localDevVPNValue: String {
+    private var connectionValue: String {
         switch diagnostics.state {
         case .notRun:
             if case .active = appModel.deviceSession.phase { return "Connected" }
@@ -180,7 +265,7 @@ struct ConnectionHealthView: View {
         }
     }
 
-    private var localDevVPNSymbol: String {
+    private var connectionSymbol: String {
         switch diagnostics.state {
         case .notRun:
             if case .active = appModel.deviceSession.phase { return "checkmark.circle.fill" }
@@ -191,7 +276,7 @@ struct ConnectionHealthView: View {
         }
     }
 
-    private var localDevVPNColor: Color {
+    private var connectionColor: Color {
         switch diagnostics.state {
         case .notRun:
             if case .active = appModel.deviceSession.phase { return .green }
@@ -230,6 +315,31 @@ struct ConnectionHealthView: View {
         case .openingLocalDevVPN, .discovering, .connecting, .stopping: .blue
         case .active: .green
         case .failed: .red
+        }
+    }
+
+    private var backgroundSessionValue: String {
+        appModel.deviceSession.backgroundKeepAlive.status.title
+    }
+
+    private var backgroundSessionSymbol: String {
+        switch appModel.deviceSession.backgroundKeepAlive.status {
+        case .receivingUpdates: "location.circle.fill"
+        case .awaitingAuthorization, .starting: "arrow.triangle.2.circlepath"
+        case .denied, .restricted, .servicesDisabled, .missingBackgroundMode, .failed:
+            "exclamationmark.triangle.fill"
+        case .locationUnavailable: "location.slash.circle"
+        case .idle, .stopped: "pause.circle"
+        }
+    }
+
+    private var backgroundSessionColor: Color {
+        switch appModel.deviceSession.backgroundKeepAlive.status {
+        case .receivingUpdates: .green
+        case .awaitingAuthorization, .starting: .blue
+        case .denied, .restricted, .servicesDisabled, .missingBackgroundMode, .failed: .orange
+        case .locationUnavailable: .orange
+        case .idle, .stopped: .secondary
         }
     }
 
@@ -297,10 +407,15 @@ struct ConnectionHealthView: View {
             let pairingRecord = try await appModel.pairingService.pairingRecordData()
             diagnostics.run(
                 pairingRecord: pairingRecord,
-                sessionPhase: appModel.deviceSession.phase
+                sessionPhase: appModel.deviceSession.phase,
+                configuration: appModel.connectionConfiguration
             )
         } catch {
-            diagnostics.run(pairingRecord: nil, sessionPhase: appModel.deviceSession.phase)
+            diagnostics.run(
+                pairingRecord: nil,
+                sessionPhase: appModel.deviceSession.phase,
+                configuration: appModel.connectionConfiguration
+            )
         }
     }
 
@@ -325,8 +440,12 @@ struct ConnectionHealthView: View {
         Pairing scheduler reason (this launch): \(appModel.onDevicePairing.schedulerFailureReason?.rawValue ?? "None")
         Pairing task configuration: \(appModel.onDevicePairing.taskConfigurationStatus.rawValue)
         Pairing task registration: \(appModel.onDevicePairing.taskRegistrationStatus.rawValue)
-        LocalDevVPN: \(localDevVPNValue)
+        Connection mode: \(appModel.connectionConfiguration.mode.title)
+        Remote endpoint: \(appModel.connectionConfiguration.remoteEndpointDescription)
+        Connection status: \(connectionValue)
         Session: \(sessionValue)
+        Connection stage: \(appModel.deviceSession.connectionStage.title)
+        Endpoint source: \(appModel.deviceSession.endpointSource?.title ?? "None")
         Last session issue stage (this launch): \(appModel.deviceSession.lastFailureStage?.rawValue ?? "None")
         Last session issue disposition: \(appModel.deviceSession.lastFailureDisposition?.rawValue ?? "None")
         Session scheduler reason (this launch): \(appModel.deviceSession.schedulerFailureReason?.rawValue ?? "None")

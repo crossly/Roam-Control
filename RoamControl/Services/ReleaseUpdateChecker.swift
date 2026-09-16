@@ -33,7 +33,7 @@ extension ReleaseUpdateStatus {
 
 struct ReleaseUpdateChecker {
     private static let latestReleaseURL = URL(
-        string: "https://api.github.com/repos/seanhowarthdev/Roam-Control/releases/latest"
+        string: "https://api.github.com/repos/crossly/Roam-Control/releases/latest"
     )!
 
     func latestRelease() async throws -> PublishedRelease {

@@ -1,0 +1,90 @@
+name: Build and release Roam Control
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  ROAMCONTROL_VERSION: "0.10.0"
+  ROAMCONTROL_BUILD: "62"
+
+jobs:
+  build:
+    runs-on: xcode-27
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Check release invariants
+        run: python3 scripts/test-release-invariants.py
+
+      - name: Test native bridge on the runner
+        run: |
+          cargo fmt --manifest-path Native/RoamPairingFFI/Cargo.toml -- --check
+          cargo test --manifest-path Native/RoamPairingFFI/Cargo.toml
+
+      - name: Rebuild native bridge
+        run: |
+          rm -rf Frameworks/RoamPairingFFI.xcframework
+          ./scripts/build-pairing-engine.sh
+
+      - name: Archive unsigned Release build
+        run: |
+          xcodebuild \
+            -project RoamControl.xcodeproj \
+            -scheme RoamControl \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/RoamControl.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package unsigned IPA
+        run: |
+          rm -rf "$RUNNER_TEMP/Payload"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$RUNNER_TEMP/RoamControl.xcarchive/Products/Applications/RoamControl.app" "$RUNNER_TEMP/Payload/"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/Payload" \
+            "RoamControl-${ROAMCONTROL_VERSION}-build${ROAMCONTROL_BUILD}.ipa"
+          shasum -a 256 \
+            "RoamControl-${ROAMCONTROL_VERSION}-build${ROAMCONTROL_BUILD}.ipa" \
+            | tee "RoamControl-${ROAMCONTROL_VERSION}-build${ROAMCONTROL_BUILD}.ipa.sha256"
+
+      - name: Package rebuilt native framework
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            Frameworks/RoamPairingFFI.xcframework \
+            "RoamPairingFFI-${ROAMCONTROL_VERSION}-build${ROAMCONTROL_BUILD}.xcframework.zip"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoamControl-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}
+          path: |
+            RoamControl-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}.ipa
+            RoamControl-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}.ipa.sha256
+            RoamPairingFFI-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}.xcframework.zip
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: Documentation/Release-0.10.0.md
+          files: |
+            RoamControl-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}.ipa
+            RoamControl-${{ env.ROAMCONTROL_VERSION }}-build${{ env.ROAMCONTROL_BUILD }}.ipa.sha256
+          generate_release_notes: false
+          prerelease: true

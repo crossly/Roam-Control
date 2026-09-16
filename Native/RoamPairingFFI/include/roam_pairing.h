@@ -85,6 +85,7 @@ int32_t rc_location_session_run(
     uint16_t remote_pairing_port,
     const char *service_identifier,
     const char *auth_tag,
+    int32_t verify_service_metadata,
     double latitude,
     double longitude,
     RCLocationStartedCallback started_callback,

@@ -254,7 +254,7 @@ private struct OnboardingPage {
         OnboardingPage(
             symbol: "iphone.and.arrow.forward",
             title: "Pair this iPhone once",
-            message: "Roam Control needs one private pairing before it can control location. We'll guide you through it next.",
+            message: "Roam Control needs one private pairing before it can control location. Use LocalDevVPN for on-device pairing, or import an existing pairing file for Remote Endpoint. We'll guide you through it next.",
             colors: [.green, .teal]
         ),
         OnboardingPage(

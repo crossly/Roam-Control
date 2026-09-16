@@ -2,9 +2,25 @@
 
 All notable public changes to Roam Control are recorded here.
 
-## [Unreleased]
+## [0.10.0] - 2026-09-16
 
-Roam Control 0.9.2 Preview - Build 58. Public validation preview; Beta 6 / Build 57 remains the recommended release until validation.
+Remote Endpoint preview release, corresponding to app version 0.10.0 Build 62.
+
+### Added
+
+- Added **Settings → Device → Connection Mode** with LocalDevVPN and Remote Endpoint transports.
+- Added configurable Remote Endpoint host and port, defaulting to `192.168.31.1:49152`.
+- Added mode-aware Connection Health checks, connection stages, endpoint source and copied diagnostics.
+
+### Improved
+
+- Kept the existing LocalDevVPN discovery, mobile-data guidance and recovery flow unchanged for LocalDevVPN mode.
+- Made Remote Endpoint failures explicit; remote mode never opens or falls back to LocalDevVPN.
+- Preserved cryptographic RPPairing verification while skipping only the mDNS metadata pre-filter in Remote Endpoint mode.
+
+## [0.9.2] - 2026-09-13
+
+Roam Control 0.9.2 Preview - Build 61. Public validation preview; earlier beta builds remain available for reference.
 
 ### Fixed
 
@@ -93,6 +109,8 @@ First public beta, corresponding to app version 0.9.0 Build 29.
 - Prevented failed location updates from being counted as successful.
 - Moved the release analytics destination and Apple development-team identifier out of tracked project settings.
 
-[Unreleased]: https://github.com/seanhowarthdev/Roam-Control/compare/v0.9.1...HEAD
-[0.9.1]: https://github.com/seanhowarthdev/Roam-Control/compare/v0.9.0-beta.1...v0.9.1
-[0.9.0-beta.1]: https://github.com/seanhowarthdev/Roam-Control/releases/tag/v0.9.0-beta.1
+[Unreleased]: https://github.com/crossly/Roam-Control/compare/v0.10.0-preview-build.62...HEAD
+[0.10.0]: https://github.com/crossly/Roam-Control/releases/tag/v0.10.0-preview-build.62
+[0.9.2]: https://github.com/crossly/Roam-Control/releases/tag/v0.9.2-preview-build.61
+[0.9.1]: https://github.com/crossly/Roam-Control/compare/v0.9.0-beta.1...v0.9.1
+[0.9.0-beta.1]: https://github.com/crossly/Roam-Control/releases/tag/v0.9.0-beta.1

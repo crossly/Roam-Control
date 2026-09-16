@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Build 61 release, scheduler and telemetry invariants without networking."""
+"""Check Build 62 release, scheduler, remote-mode and telemetry invariants without networking."""
 
 from pathlib import Path
 import plistlib
@@ -25,8 +25,8 @@ def function_body(source: str, signature: str) -> str:
 
 
 project = (ROOT / "RoamControl.xcodeproj/project.pbxproj").read_text()
-assert project.count("CURRENT_PROJECT_VERSION = 61;") == 2
-assert project.count("MARKETING_VERSION = 0.9.2;") == 2
+assert project.count("CURRENT_PROJECT_VERSION = 62;") == 2
+assert project.count("MARKETING_VERSION = 0.10.0;") == 2
 
 with (ROOT / "Configuration/RoamControl-Info.plist").open("rb") as stream:
     info = plistlib.load(stream)
@@ -113,6 +113,19 @@ assert "Location task registration:" in diagnostics
 assert "Pairing task configuration:" in diagnostics
 assert "Pairing task registration:" in diagnostics
 
+configuration = (ROOT / "RoamControl/Services/Tunnel/ConnectionConfiguration.swift").read_text()
+assert 'static let defaultRemoteHost = "192.168.31.1"' in configuration
+assert "static let defaultRemotePort: UInt16 = 49152" in configuration
+assert "case remoteEndpoint" in configuration
+
+assert "init(configuration: ConnectionConfiguration)" in session
+assert "beginRemoteEndpointConnection()" in session
+assert "let verifyServiceMetadata: Int32 = (sessionMode ?? configuration.mode) == .localDevVPN ? 1 : 0" in session
+assert "if (sessionMode ?? configuration.mode) == .remoteEndpoint" in session
+assert "ConnectionConfigurationView()" in diagnostics
+assert "Connection mode: \\(appModel.connectionConfiguration.mode.title)" in diagnostics
+assert "Remote endpoint: \\(appModel.connectionConfiguration.remoteEndpointDescription)" in diagnostics
+
 private_config = ROOT / "Configuration/Local.private.xcconfig"
 if private_config.exists():
     match = re.search(
@@ -130,4 +143,4 @@ if private_config.exists():
             if path.is_file():
                 assert token not in path.read_text(errors="ignore"), f"Private token tracked in {relative}"
 
-print("Build 61 release, scheduler and consent-gate source checks passed; no network requests made.")
+print("Build 62 release, scheduler, remote-mode and consent-gate source checks passed; no network requests made.")

@@ -2,11 +2,12 @@ import SwiftUI
 
 struct SettingsView: View {
     private static let bugReportURL = URL(
-        string: "https://github.com/seanhowarthdev/Roam-Control/issues/new?template=bug_report.yml"
+        string: "https://github.com/crossly/Roam-Control/issues/new?template=bug_report.yml"
     )!
     private static let featureRequestURL = URL(
-        string: "https://github.com/seanhowarthdev/Roam-Control/issues/new?template=feature_request.yml"
+        string: "https://github.com/crossly/Roam-Control/issues/new?template=feature_request.yml"
     )!
+
 
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
@@ -39,6 +40,22 @@ struct SettingsView: View {
                 }
 
                 Section("Device") {
+                    NavigationLink {
+                        ConnectionConfigurationView()
+                            .environment(appModel)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Connection Mode")
+                                Text(appModel.connectionConfiguration.mode.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: appModel.connectionConfiguration.mode.systemImage)
+                        }
+                    }
+
                     NavigationLink {
                         ConnectionHealthView()
                             .environment(appModel)

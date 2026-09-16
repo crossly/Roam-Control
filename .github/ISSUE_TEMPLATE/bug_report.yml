@@ -12,7 +12,7 @@ body:
     id: app-version
     attributes:
       label: Roam Control version and build
-      placeholder: 0.9.1 (Build 31)
+      placeholder: 0.10.0 (Build 62)
     validations:
       required: true
   - type: input
@@ -36,8 +36,9 @@ body:
     attributes:
       label: Connection
       options:
-        - Wi-Fi
-        - Mobile data
+        - LocalDevVPN over Wi-Fi
+        - LocalDevVPN over mobile data
+        - Remote Endpoint
         - Not connection-related
     validations:
       required: true
